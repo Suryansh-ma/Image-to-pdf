@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image to PDF Tool</title>
+<link rel="icon" href="https://i.ibb.co/BHcN0z7R/image-wm.png">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+body{
+  margin:0;
+  font-family:system-ui;
+  background:linear-gradient(135deg,#6ee7f9,#a78bfa);
+  min-height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+.app{
+  width:100%;
+  max-width:430px;
+  background:#f4f6fb;
+  border-radius:26px;
+  overflow:hidden;
+  box-shadow:0 30px 60px rgba(0,0,0,.25);
+}
+.header{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:16px;
+  background:linear-gradient(135deg,#6ee7f9,#a78bfa);
+  color:#fff;
+}
+.header img{
+  width:42px;
+  height:42px;
+  border-radius:12px;
+  background:#fff;
+}
+.page{padding:16px}
+.card{
+  background:#fff;
+  border-radius:18px;
+  padding:16px;
+  margin-bottom:14px;
+  box-shadow:0 10px 25px rgba(0,0,0,.08);
+}
+.options{
+  display:flex;
+  justify-content:center;
+  gap:18px;
+  margin-bottom:12px;
+}
+.upload{
+  border:2px dashed #c7d2fe;
+  border-radius:16px;
+  padding:18px;
+  text-align:center;
+}
+.upload input{display:none}
+.upload label{
+  display:inline-block;
+  padding:12px 22px;
+  border-radius:14px;
+  border:2px solid #a78bfa;
+  color:#a78bfa;
+  cursor:pointer;
+}
+.preview{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  margin-top:12px;
+}
+.preview img{
+  width:100%;
+  border-radius:10px;
+}
+input[type=text]{
+  width:100%;
+  padding:12px;
+  border-radius:12px;
+  border:1px solid #ddd;
+  margin-bottom:12px;
+}
+button{
+  width:100%;
+  padding:14px;
+  border-radius:14px;
+  border:2px solid #a78bfa;
+  background:transparent;
+  color:#a78bfa;
+  font-size:16px;
+  cursor:pointer;
+}
+button:hover{
+  background:#a78bfa;
+  color:#fff;
+}
+.loader{
+  display:none;
+  justify-content:center;
+  padding:10px;
+}
+.loader span{
+  width:10px;height:10px;
+  background:#a78bfa;
+  border-radius:50%;
+  margin:4px;
+  animation:bounce 1s infinite alternate;
+}
+.loader span:nth-child(2){animation-delay:.2s}
+.loader span:nth-child(3){animation-delay:.4s}
+@keyframes bounce{to{transform:translateY(-12px)}}
+.footer{
+  text-align:center;
+  font-size:12px;
+  opacity:.6;
+  padding-bottom:12px;
+}
+</style>
+</head>
+<body>
+
+<script src="https://www.highperformanceformat.com/f985e2ea6937971cb19c93392f8d11ba/invoke.js"></script>
+
+<div class="app">
+
+  <div class="header">
+    <img src="https://i.ibb.co/BHcN0z7R/image-wm.png">
+    <h1>Image to PDF Tool</h1>
+  </div>
+
+  <div class="page">
+    <div class="card">
+      <input type="text" id="pdfName" placeholder="Enter PDF file name">
+
+      <div class="options">
+        <label><input type="radio" name="mode" value="text" checked> Only Text</label>
+        <label><input type="radio" name="mode" value="image"> Image Only</label>
+      </div>
+
+      <div class="upload">
+        <label for="images">Upload Images</label>
+        <input type="file" id="images" accept="image/*" multiple>
+        <div class="preview" id="preview"></div>
+      </div>
+    </div>
+
+    <button onclick="generatePDF()">Generate PDF</button>
+    <div class="loader" id="loader"><span></span><span></span><span></span></div>
+  </div>
+  <script>
+  
+  <div class="footer">© suryansh maurya</div>
+</div>
+
+<script>
+const input = document.getElementById("images");
+const preview = document.getElementById("preview");
+const loader = document.getElementById("loader");
+let files = [];
+
+input.onchange = () => {
+  preview.innerHTML = "";
+  files = [...input.files];
+  files.forEach(f=>{
+    const img = document.createElement("img");
+    img.src = URL.createObjectURL(f);
+    preview.appendChild(img);
+  });
+};
+
+async function generatePDF(){
+  if(files.length===0){alert("Upload images");return;}
+  loader.style.display="flex";
+
+  const name = document.getElementById("pdfName").value || "image-to-pdf";
+  const mode = document.querySelector("input[name=mode]:checked").value;
+  const {jsPDF} = window.jspdf;
+  const pdf = new jsPDF({compress:false});
+
+  for(let i=0;i<files.length;i++){
+    if(i>0) pdf.addPage();
+
+    if(mode==="image"){
+      const img = await loadHighRes(files[i]);
+      const w = pdf.internal.pageSize.getWidth();
+      const h = img.height*w/img.width;
+      pdf.addImage(img,"JPEG",0,0,w,h,undefined,"FAST");
+    } else {
+      const text = await extractText(files[i]);
+      pdf.setFontSize(14);
+      pdf.text(text,10,20,{maxWidth:180});
+    }
+  }
+
+  pdf.save(name+".pdf");
+  loader.style.display="none";
+}
+
+function loadHighRes(file){
+  return new Promise(res=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const c = document.createElement("canvas");
+      c.width = img.width*4;
+      c.height = img.height*4;
+      const ctx = c.getContext("2d");
+      ctx.drawImage(img,0,0,c.width,c.height);
+      const hq = new Image();
+      hq.onload = ()=>res(hq);
+      hq.src = c.toDataURL("image/jpeg",1.0);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function extractText(file){
+  const fd = new FormData();
+  fd.append("apikey","helloworld"); // free demo key
+  fd.append("language","eng");
+  fd.append("file",file);
+  fd.append("isOverlayRequired",false);
+
+  const res = await fetch("https://api.ocr.space/parse/image",{
+    method:"POST",
+    body:fd
+  });
+
+  const data = await res.json();
+  if(!data.ParsedResults || !data.ParsedResults[0]) return "Text not detected";
+
+  return data.ParsedResults[0].ParsedText
+    .replace(/[^\x20-\x7E\n]/g,"")
+    .replace(/\n{2,}/g,"\n")
+    .trim();
+}
+</script>
+
+</body>
+</html>
